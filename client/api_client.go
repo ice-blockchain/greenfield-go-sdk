@@ -628,20 +628,22 @@ func (c *Client) generateURL(bucketName string, objectName string, relativePath 
 		}
 		urlStr = scheme + "://" + host + prefix + "/"
 	} else {
-		urlStr = scheme + "://" + host + "/"
+		u := url.URL{Scheme: scheme, Host: host, Path: endpoint.Path}
 		if bucketName != "" {
 			if isVirtualHost {
-				// set virtual host url
-				urlStr = scheme + "://" + bucketName + "." + host + "/"
+				u.Host = bucketName + "." + host
 			} else {
-				// set path style url
-				urlStr = urlStr + bucketName + "/"
+				u = *u.JoinPath(bucketName)
 			}
-
 			if objectName != "" {
-				urlStr += utils.EncodePath(objectName)
+				u = *u.JoinPath(utils.EncodePath(objectName))
 			}
 		}
+		// Ensure trailing slash for SP compatibility.
+		if !strings.HasSuffix(u.Path, "/") {
+			u.Path += "/"
+		}
+		urlStr = u.String()
 	}
 
 	if relativePath != "" {
