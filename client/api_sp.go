@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/hex"
 	math2 "math"
-	"strings"
+	"net/url"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/prysmaticlabs/prysm/crypto/bls"
 
 	"cosmossdk.io/math"
-	"github.com/bnb-chain/greenfield-go-sdk/pkg/utils"
 	"github.com/bnb-chain/greenfield-go-sdk/types"
 	gnfdSdkTypes "github.com/bnb-chain/greenfield/sdk/types"
 	spTypes "github.com/bnb-chain/greenfield/x/sp/types"
@@ -128,13 +127,7 @@ func (c *Client) refreshStorageProviders(ctx context.Context) error {
 		return err
 	}
 	for _, spInfo := range gnfdRep.Sps {
-		var useHttps bool
-		if strings.Contains(spInfo.Endpoint, "https") {
-			useHttps = true
-		} else {
-			useHttps = c.secure
-		}
-		urlInfo, urlErr := utils.GetEndpointURL(spInfo.Endpoint, useHttps)
+		urlInfo, urlErr := url.Parse(spInfo.Endpoint)
 		if urlErr != nil {
 			return urlErr
 		}
