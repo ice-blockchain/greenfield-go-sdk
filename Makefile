@@ -19,7 +19,7 @@ format:
 .PHONY: lint lint-fix format examples
 
 e2e_test:
-	go test -p 1 -failfast -v ./e2e/... -timeout 99999s
+	CGO_CFLAGS="-std=gnu11" go test -p 1 -failfast -v ./e2e/... -timeout 99999s
 
 examples:
 	@echo "Building examples"
