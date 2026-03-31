@@ -636,7 +636,7 @@ func (c *Client) generateURL(bucketName string, objectName string, relativePath 
 				u = *u.JoinPath(bucketName)
 			}
 			if objectName != "" {
-				u = *u.JoinPath(utils.EncodePath(objectName))
+				u = *u.JoinPath(objectName)
 			}
 		}
 		// Ensure trailing slash for SP compatibility.
