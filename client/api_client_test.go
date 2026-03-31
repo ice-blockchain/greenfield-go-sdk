@@ -152,6 +152,46 @@ func TestGenerateURL(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name:     "admin API v1 with endpoint path",
+			endpoint: "https://sp.example.com/base/path",
+			adminInfo: AdminAPIInfo{
+				isAdminAPI:   true,
+				adminVersion: types.AdminV1Version,
+			},
+			want: "https://sp.example.com/base/path" + types.AdminURLPrefix + types.AdminURLV1Version + "/",
+		},
+		{
+			name:     "admin API v2 with endpoint path",
+			endpoint: "https://sp.example.com/base/path",
+			adminInfo: AdminAPIInfo{
+				isAdminAPI:   true,
+				adminVersion: types.AdminV2Version,
+			},
+			want: "https://sp.example.com/base/path" + types.AdminURLPrefix + types.AdminURLV2Version + "/",
+		},
+		{
+			name:          "virtual host with endpoint path",
+			endpoint:      "https://sp.example.com/base",
+			bucketName:    "mybucket",
+			objectName:    "myobject",
+			isVirtualHost: true,
+			want:          "https://mybucket.sp.example.com/base/myobject/",
+		},
+		{
+			name:         "endpoint path with relative path",
+			endpoint:     "https://sp.example.com/base",
+			bucketName:   "mybucket",
+			relativePath: "extra",
+			want:         "https://sp.example.com/base/mybucket/extra",
+		},
+		{
+			name:        "endpoint path with query values",
+			endpoint:    "https://sp.example.com/base",
+			bucketName:  "mybucket",
+			queryValues: url.Values{"foo": {"bar"}},
+			want:        "https://sp.example.com/base/mybucket/?foo=bar",
+		},
 	}
 
 	for _, tt := range tests {

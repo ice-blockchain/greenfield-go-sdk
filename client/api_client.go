@@ -626,7 +626,9 @@ func (c *Client) generateURL(bucketName string, objectName string, relativePath 
 		} else {
 			return nil, fmt.Errorf("invalid admin version %d", adminInfo.adminVersion)
 		}
-		urlStr = scheme + "://" + host + prefix + "/"
+		u := url.URL{Scheme: scheme, Host: host, Path: endpoint.Path}
+		u = *u.JoinPath(prefix + "/")
+		urlStr = u.String()
 	} else {
 		u := url.URL{Scheme: scheme, Host: host, Path: endpoint.Path}
 		if bucketName != "" {
