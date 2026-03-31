@@ -626,22 +626,26 @@ func (c *Client) generateURL(bucketName string, objectName string, relativePath 
 		} else {
 			return nil, fmt.Errorf("invalid admin version %d", adminInfo.adminVersion)
 		}
-		urlStr = scheme + "://" + host + prefix + "/"
+		u := url.URL{Scheme: scheme, Host: host, Path: endpoint.Path}
+		u = *u.JoinPath(prefix + "/")
+		urlStr = u.String()
 	} else {
-		urlStr = scheme + "://" + host + "/"
+		u := url.URL{Scheme: scheme, Host: host, Path: endpoint.Path}
 		if bucketName != "" {
 			if isVirtualHost {
-				// set virtual host url
-				urlStr = scheme + "://" + bucketName + "." + host + "/"
+				u.Host = bucketName + "." + host
 			} else {
-				// set path style url
-				urlStr = urlStr + bucketName + "/"
+				u = *u.JoinPath(bucketName)
 			}
-
 			if objectName != "" {
-				urlStr += utils.EncodePath(objectName)
+				u = *u.JoinPath(objectName)
 			}
 		}
+		// Ensure trailing slash for SP compatibility.
+		if !strings.HasSuffix(u.Path, "/") {
+			u.Path += "/"
+		}
+		urlStr = u.String()
 	}
 
 	if relativePath != "" {

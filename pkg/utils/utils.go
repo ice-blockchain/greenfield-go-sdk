@@ -80,10 +80,6 @@ func checkEndpointUrl(endpointURL url.URL) error {
 		return errors.New("Endpoint url is empty.")
 	}
 
-	if endpointURL.Path != "/" && endpointURL.Path != "" {
-		return errors.New("Endpoint paths invalid")
-	}
-
 	host := endpointURL.Hostname()
 	if !IsIPValid(host) && !IsDomainNameValid(host) {
 		msg := endpointURL.Host + " does not meet ip address or domain name standards"
