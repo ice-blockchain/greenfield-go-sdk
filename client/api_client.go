@@ -641,8 +641,8 @@ func (c *Client) generateURL(bucketName string, objectName string, relativePath 
 				u = *u.JoinPath(objectName)
 			}
 		}
-		// Ensure trailing slash for SP compatibility.
-		if !strings.HasSuffix(u.Path, "/") {
+		keepTrailingSlash := objectName == "" || relativePath != "" || strings.HasSuffix(objectName, "/")
+		if keepTrailingSlash && !strings.HasSuffix(u.Path, "/") {
 			u.Path += "/"
 		}
 		urlStr = u.String()
