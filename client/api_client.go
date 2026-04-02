@@ -750,20 +750,32 @@ func swapToRealSPURL(req *http.Request, bucketName string) (proxyURL *url.URL) {
 		return nil
 	}
 
-	// Build the real SP URL the same way the direct SDK would.
+	// Normalize host: strip default ports to match generateURL behaviour.
 	host := spURL.Host
-	realPath := "/" + objectPath
+	if h, p, err := net.SplitHostPort(host); err == nil {
+		if (spURL.Scheme == "https" && p == "443") || (spURL.Scheme == "http" && p == "80") {
+			host = h
+		}
+	}
+
+	// Build path from the SP's base path + the object path.
+	basePath := strings.TrimRight(spURL.Path, "/")
+	realPath := basePath + "/" + objectPath
 
 	// Virtual-hosted style: bucket becomes a subdomain, stripped from path.
-	if bucketName != "" && utils.IsDomainNameValid(spURL.Host) &&
+	if bucketName != "" && utils.IsDomainNameValid(host) &&
 		!(spURL.Scheme == "https" && strings.Contains(bucketName, ".")) {
 		host = bucketName + "." + host
 		// objectPath is "bucket/object..." — strip the bucket prefix.
 		if after, found := strings.CutPrefix(objectPath, bucketName+"/"); found {
-			realPath = "/" + after
+			realPath = basePath + "/" + after
 		} else if objectPath == bucketName {
-			realPath = "/"
+			realPath = basePath + "/"
 		}
+	}
+
+	if realPath == "" {
+		realPath = "/"
 	}
 
 	// Save the proxy URL, swap in the real SP URL.
