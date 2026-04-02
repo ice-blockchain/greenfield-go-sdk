@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
@@ -486,6 +487,7 @@ func (c *Client) newRequest(ctx context.Context, method string, meta requestMeta
 		} else if req.URL.Host != "" {
 			req.Host = req.URL.Host
 		}
+
 	}
 
 	if meta.userAddress != "" {
@@ -507,8 +509,18 @@ func (c *Client) newRequest(ctx context.Context, method string, meta requestMeta
 	// set user-agent
 	req.Header.Set(types.HTTPHeaderUserAgent, c.userAgent)
 
+	// When going through the proxy, sign using the real SP URL (host + path)
+	// so the SP can verify the signature. Then restore the proxy URL for routing.
+	proxyURL := swapToRealSPURL(req, meta.bucketName)
+
 	// sign the total http request info when auth type v1
 	err = c.signRequest(req)
+
+	// Restore proxy URL so the HTTP client routes to the proxy.
+	if proxyURL != nil {
+		req.URL = proxyURL
+	}
+
 	if err != nil {
 		return req, err
 	}
@@ -581,7 +593,7 @@ func (c *Client) sendReq(ctx context.Context, metadata requestMeta, opt *sendOpt
 
 	resp, err := c.doAPI(ctx, req, metadata, !opt.disableCloseBody)
 	if err != nil {
-		log.Error().Msg(fmt.Sprintf("do API error, url: %s, err: %s", req.URL.String(), err))
+		log.Error().Str("url", req.URL.String()).Err(err).Msg("request to SP failed")
 		return nil, err
 	}
 	return resp, nil
@@ -705,6 +717,65 @@ func (c *Client) signRequest(req *http.Request) error {
 	req.Header.Set(types.HTTPHeaderAuthorization, strings.Join(authStr, ", "))
 
 	return nil
+}
+
+// swapToRealSPURL detects proxy-style SP URLs (http with /sp/{base64}/...
+// path) and replaces req.URL + req.Host with the real SP URL so that the
+// GNFD1-ECDSA signature covers the correct host and path. Returns the
+// original proxy URL so the caller can restore it after signing.
+// Returns nil if the request is not a proxied SP endpoint.
+func swapToRealSPURL(req *http.Request, bucketName string) (proxyURL *url.URL) {
+	if req.URL.Scheme != "http" {
+		return nil
+	}
+
+	// Path is like /sp/{base64}/bucket/object — split off the /sp/ prefix.
+	rest := strings.TrimPrefix(req.URL.Path, "/sp/")
+	if rest == req.URL.Path {
+		return nil
+	}
+
+	encoded, objectPath, _ := strings.Cut(rest, "/")
+	if encoded == "" {
+		return nil
+	}
+
+	decoded, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil
+	}
+
+	spURL, err := url.Parse(string(decoded))
+	if err != nil || spURL.Host == "" {
+		return nil
+	}
+
+	// Build the real SP URL the same way the direct SDK would.
+	host := spURL.Host
+	realPath := "/" + objectPath
+
+	// Virtual-hosted style: bucket becomes a subdomain, stripped from path.
+	if bucketName != "" && utils.IsDomainNameValid(spURL.Host) &&
+		!(spURL.Scheme == "https" && strings.Contains(bucketName, ".")) {
+		host = bucketName + "." + host
+		// objectPath is "bucket/object..." — strip the bucket prefix.
+		if after, found := strings.CutPrefix(objectPath, bucketName+"/"); found {
+			realPath = "/" + after
+		} else if objectPath == bucketName {
+			realPath = "/"
+		}
+	}
+
+	// Save the proxy URL, swap in the real SP URL.
+	proxyURL = req.URL
+	req.URL = &url.URL{
+		Scheme:   spURL.Scheme,
+		Host:     host,
+		Path:     realPath,
+		RawQuery: proxyURL.RawQuery,
+	}
+	req.Host = host
+	return proxyURL
 }
 
 // returns true if virtual hosted style requests are to be used.
